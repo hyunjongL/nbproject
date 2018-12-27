@@ -20,6 +20,7 @@ define(function(require) {
       Models          = require('models'),
       Pers            = require('pers'),
       Perspective     = require('perspective'),
+      Minimap         = require('minimap'),
       Notepane        = require('notepane_doc'),
       threadview      = require('threadview'),
       editorview      = require('editorview');
@@ -160,7 +161,17 @@ define(function(require) {
 
           //let's create perspective here:
           var $pers = $("<div id='pers_" + id_source + "'/>").appendTo($vp);
-
+          var minimapview = {
+            priority: 1,
+            min_width: 250,
+            desired_width: 35,
+            min_height: 1000,
+            desired_height: 50,
+            content: function ($div) {
+              $div.minimapView();
+              $div.minimapView('set_model', Pers.store);
+            },
+          }
           var notesview = {
             priority: 1,
             min_width: 650,
@@ -226,15 +237,21 @@ define(function(require) {
                 },
               },
               views: {
-                v1: { data: notesview },
+                v1: {data: minimapview},
                 v2: {
                   children: {
-                    v1: { data: threadview },
-                    v2: { data: editorview },
+                    v1: { data: notesview },
+                    v2: {
+                      children: {
+                        v1: { data: threadview },
+                        v2: { data: editorview },
+                        orientation: 'horizontal',
+                      },
+                    },
                     orientation: 'horizontal',
                   },
                 },
-                orientation: 'horizontal',
+                orientation: 'vertical'
               },
             });
 

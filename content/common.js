@@ -82,6 +82,7 @@ requirejs.config({
     'filterwizardEmoticon': 'views/ui.filterwizardEmoticon',
     'filesview': 'views/ui.filesview',
     'notepane_collage': 'views/ui.notepaneView.collage',
+    'minimap': 'views/ui.minimapview',
     'notepane_doc': 'views/ui.notepaneView.doc',
     'notepane_spreadsheet': 'views/ui.notepaneView.spreadsheet',
     'notepane_video': 'views/ui.notepaneView.video',
