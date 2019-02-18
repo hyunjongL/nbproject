@@ -59,34 +59,58 @@ define(function(require) {
       self.height = 0;
       self.documentHeight = 0;
       self.documentWidth = 0;
+      self.maxAnnots = 1;
 
       self.locs = null;
-      self.element.addClass('minimapView')
-      //.append("<div class='threadview-header'><div class='threadview-header-sectioninfo'/><div class='threadview-filter-controls'> <div class='nbicon questionicon' /><button class='mark-toggle' arg='add' action='question'>+</button><span class='n_question'>...</span><button class='mark-toggle' arg='remove' action='question'>-</button> <span id='thread_request_reply'>replies requested</span>  <!--<button class='mark-toggle' action='star'><div class='nbicon staricon-hicontrast' /><span class='n_star'>...</span><span id='thread_mark_favorite'>Mark as Favorite.</span></button>--></div></div><div class='threadview-pane'/>");
+      self.element.addClass('minimapView')      
+
+      self.minimapDiv = document.createElement('div');
+      self.minimapDiv.id = "minimapDiv"
+      self.minimapDiv.style.position = "absolute"
+      self.element[0].append(self.minimapDiv)
+
       self.minimapCanvas = document.createElement('canvas');
       self.minimapCanvas.id = "minimapCanvas"
       self.minimapCanvas.style.position="absolute"
       self.element[0].append(self.minimapCanvas)
+      self.minimapCanvas.style['pointer-events'] = 'none'
+
 
       self.minimapScrollBar = document.createElement('div');
       self.minimapScrollBar.style.position="absolute"
-      self.minimapScrollBar.style.border = "3px solid #000"
+      self.minimapScrollBar.style.border = "2px solid #000"
+      // self.minimapScrollBar.style.backgroundColor = "rgba(100,100,100,0.3)"
+      self.minimapScrollBar.style["pointer-events"] = "none"
       self.minimapScrollBar.id = "scrollWindow"
       self.element[0].append(self.minimapScrollBar)
+
+
 
       self.element.closest('div.perspective').bind('resize_perspective', function (evt, directions) {
         self._render()
       });
       $(window).resize(self._render);
-      window.onscroll = this.scrollHandler
+      // window.onscroll = this.scrollHandler
+      this.scrolling = false
+      $(window).scroll(function(){
+        this.scrolling = true
+      })
+      // $(window).scroll(this.scrollHandler)
+      setInterval(this.scrollHandler, 20)
       self.element.closest('div.pers-protection')
+      this.commentElements = {}
+      this.html5locationNum = 0
 
-    },
+    }, 
 
     _defaultHandler: function (evt) {
     },
 
     scrollHandler: function(e){
+      if(!this.scrolling){
+        return;
+      } 
+      this.scrolling = false
       const scrollWindow = this.scrollWindow
       const totalHeight = $('body').height()
       const totalScroll = totalHeight - window.innerHeight
@@ -95,9 +119,9 @@ define(function(require) {
       const barTotalScroll = scrollWindow.parentElement.offsetHeight - scrollWindow.offsetHeight
       scrollWindow.style.top = barTotalScroll * currentScroll + 'px'
 
-      const minimapTotalScroll = this.minimapCanvas.offsetHeight - this.minimapCanvas.parentElement.offsetHeight
-      console.log(this.minimapCanvas, '-' + minimapTotalScroll * currentScroll + 'px')
+      const minimapTotalScroll = this.minimapDiv.offsetHeight - this.minimapDiv.parentElement.offsetHeight
       this.minimapCanvas.style.top = '-' + minimapTotalScroll * currentScroll + 'px'
+      this.minimapDiv.style.top = '-' + minimapTotalScroll * currentScroll + 'px'
     },
 
     set_model: function (model) {
@@ -106,7 +130,8 @@ define(function(require) {
       var id_source = $.concierge.get_state('file');
       self._id_source =  id_source;
       model.register($.ui.view.prototype.get_adapter.call(this),  { location: null, seen: null, threadmark: null });
-
+      //for all annotations
+      return;
       //make placeholders for each page:
       var f = model.o.file[id_source];
       var $pane = $('div.notepaneView-pages', self.element);
@@ -149,15 +174,52 @@ define(function(require) {
       const minimapHeight = this.element[0].offsetHeight
       const minimapWidth = this.element[0].offsetWidth
       const mainWidth = $('main')[0].offsetWidth
+      const emotes = ['#interested', '#curious', '#question', '#confused', '#idea', '#frustrated', '#help', '#useful']
+
+      html5locationNum = Object.keys(this._model.o.html5location).length
+      if(html5locationNum != this.calculatedNum){
+        console.log(this._model.o)
+        var location, body;
+        this.calculatedNum = html5locationNum
+        var i = 0;
+        for(i in this._model.o.html5location){
+          var annot = this._model.o.html5location[i]
+          if(annot.path1 in this.commentElements){
+            this.commentElements[annot.path1].numAnnots += 1
+          }else{
+            this.commentElements[annot.path1] = {numAnnots: 1, emotes: {curious: 0, interested: 0, question: 0, confused: 0, idea: 0, frustrated: 0, help: 0, useful: 0}}
+          }
+          body = this._model.o.location[annot.id_location].body
+          // body = this._model.o.comment
+          // if(body.indexOf('#interested') > 0){
+          //   this.commentElements[annot.path1].emotes.interested
+          // }
+          for(var j=0; j<emotes.length; j++){
+            const emote = emotes[j]
+            if(body.indexOf(emote) > 0){
+              this.commentElements[annot.path1].emotes[emote.substring(1)] += 1
+            }
+          }
+          if(this.commentElements[annot.path1].numAnnots > this.maxAnnots){
+            this.maxAnnots = this.commentElements[annot.path1].numAnnots
+          }
+          this.commentElements[annot.path1].emotesSorted = Object.keys(this.commentElements[annot.path1].emotes).sort((a, b)=>{
+            return this.commentElements[annot.path1].emotes[b] - this.commentElements[annot.path1].emotes[a]
+          })
+
+        }
+        console.log(this.commentElements)
+      }
+
       if(this.documentHeight != documentHeight || this.documentWidth != documentWidth){
-        this.minimapScrollBar.style.width = minimapWidth-3 + 'px'
+        this.minimapScrollBar.style.width = minimapWidth - 7 + 'px'
         this.minimapScrollBar.style.height = (minimapWidth * window.innerHeight / mainWidth) + 'px'
         //ratio recalculation
         //redraw canvas from scratch
         const canvas = this.minimapCanvas
         const context = this.minimapCanvas.getContext('2d');
         context.clearRect(0, 0 , canvas.width, canvas.height)
-        context.fillStyle = ""
+        context.fillStyle = "rgba(255, 255, 0, 0.5)"
 
         canvas.width = documentWidth
         canvas.height = documentHeight / 4
@@ -165,9 +227,17 @@ define(function(require) {
         const ratio = documentHeight / documentWidth
         canvas.style.height = minimapWidth * ratio + 'px'
 
+        const minimapDiv = this.minimapDiv
+        $(minimapDiv).empty()
+        minimapDiv.style.height = minimapWidth * ratio + 'px'
+        minimapDiv.style.width = minimapWidth + 'px'
+        const minimapRatio = minimapWidth / mainWidth
+
+
         // Draw Map
-        context.fillStyle = "#dbdbdb"
-        const paragraphs = $('p, header, h1, h2, h3, h4, h5, h6, li, strong, a')
+        var fillStyle = "#dbdbdb"
+        // context.fillStyle = "#dbdbdb"
+        const paragraphs = $('p, header, h1, h2, h3, h4, h5, h6, ol, ul')
         for(i=0;i<paragraphs.length;i++){
           const element = paragraphs[i]
           const position = $(element).offset()
@@ -177,38 +247,91 @@ define(function(require) {
           if(i == 'length'){
             // console.log(position)
           }
-          if(['H1', 'H2', 'H3', 'H4', 'STRONG'].includes(element.tagName)){
-            context.fillStyle = "#909090"
-          }else if(element.tagName == 'A'){
-            console.log()
-            context.fillStyle = "#337ab7"
-          }else {
-            context.fillStyle = "#dbdbdb"
+          if(['H1', 'H2', 'H3', 'H4'].includes(element.tagName)){
+            fillStyle = "#909090"
+          }else{
+            fillStyle = "#dbdbdb"
           }
-          context.fillRect(position.left, position.top / 4, element.offsetWidth, element.offsetHeight / 4 - 3)
+          // context.fillRect(position.left, position.top / 4, element.offsetWidth, element.offsetHeight / 4 - 3)
+          var newElem = document.createElement('div')
+          newElem.style.height = element.offsetHeight * minimapRatio - 1 + 'px'
+          newElem.style.width = element.offsetWidth * minimapRatio - 1 + 'px'
+          newElem.style.backgroundColor = fillStyle
+          newElem.style.position = 'absolute'
+          newElem.style.top = position.top * minimapRatio + 2 + 'px'
+          newElem.style.left = position.left * minimapRatio + 2 + 'px'
+          $(newElem).mouseenter(function(elem, docuElem){
+            elem.style.backgroundColor = "rgba(255,255,255,0.3)"
+            if(this.selected != docuElem){
+              docuElem.style.backgroundColor = "#dbdbdb"
+            }
+          }.bind(this, newElem, element))
+
+          $(newElem).mouseleave(function(elem, fillStyle, docuElem){
+            elem.style.backgroundColor = fillStyle
+            if(this.selected != docuElem){
+              docuElem.style.backgroundColor = ""
+            }else{
+              docuElem.style.border = "grey solid 1px"
+
+            }
+          }.bind(this, newElem, fillStyle, element))
+
+          $(newElem).click(function(elem, top, e) {
+            if(this.selected){
+              this.selected.style.backgroundColor = ""
+            }
+            $("HTML, BODY").animate({ scrollTop: top }, 300);
+            docuElem.style.border = "grey solid 1px"
+            this.selected = elem
+          }.bind(this, element, position.top))
+
+          minimapDiv.append(newElem)
         }
 
-        context.fillStyle = "#212529"
+        // context.fillStyle = "#212529"
         const images = $('img')
         for(i=0;i<images.length;i++){
           const element = images[i]
-          const position = $(element).offset()
-          if(i == 'length'){
-            
-            // console.log(position)
+          if($(element).parents('main').length < 1
+            || element.src == "https://a.mtstatic.com/@public/production/site_4463/1474922585-logo.png"){
+            continue;
           }
-          context.drawImage(element,position.left, position.top / 4, element.offsetWidth, element.offsetHeight / 4)
+          const position = $(element).offset()
+          var newElem = document.createElement('img')
+          newElem.src = element.src
+          newElem.style.height = element.offsetHeight * minimapRatio - 2 + 'px'
+          newElem.style.width = element.offsetWidth * minimapRatio - 2 + 'px'
+          newElem.style.position = 'absolute'
+          newElem.style.top = position.top * minimapRatio + 4 + 'px'
+          newElem.style.left = position.left * minimapRatio + 4 + 'px'
+          minimapDiv.append(newElem)
+          // context.drawImage(element,position.left, position.top / 4, element.offsetWidth, element.offsetHeight / 4)
         }
-        // Locate 
-
-        //for all annotations
-        for(i in this._model.o.html5location){
-          var annot = this._model.o.html5location[i]
-          getElementsByXPath(document, annot.path1)[0].style['border-color'] = 'red'
-          $(getElementsByXPath(document, annot.path1)[0]).offset
+        
+        var elem, position, score;
+        const test = {}
+        for(i in this.commentElements){
+          context.fillStyle = "rgba(225, 225, 0, 0.7)"
+          elem = getElementsByXPath(document, i)[0]
+          position = $(elem).offset()
+          score = this.commentElements[i].numAnnots / this.maxAnnots
+          if(!position || elem.offsetHeight > 500){
+            continue;
+          }
+          test[i] = elem.offsetHeight
+          context.fillRect(position.left, position.top / 4, canvas.width * score, elem.offsetHeight / 4)
+          // console.log('conf', this.commentElements[i].emotes)
+          if(this.commentElements[i].emotes['confused'] > 0){
+            console.log(i, 'confused')
+            context.fillStyle = "rgba(225, 0, 0, 1)"
+            context.fillRect(position.left + elem.offsetWidth - 8, position.top / 4, 15, elem.offsetHeight / 4)
+            elem.style['border-right'] = '3px solid red'
+          }
         }
-      }
-      if(this.height != minimapHeight || this.width != minimapWidth){
+        const sorted = Object.keys(test).sort((a, b)=>test[b]-test[a])
+        console.log('sorted', sorted, test, test[sorted[0]], test[sorted[1]], test[sorted[2]])
+      }else if(this.height != minimapHeight || this.width != minimapWidth){
         //canvas resize
         this.height = minimapHeight
         this.width = minimapWidth
@@ -220,7 +343,6 @@ define(function(require) {
     },
 
     update: function () {
-      console.log("updated")
       this._render()
       return
     },
