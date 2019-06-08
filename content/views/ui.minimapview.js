@@ -185,8 +185,8 @@ define(function(require) {
         return;
       }
       var newElem = document.createElement('div')
-      newElem.style.height = element.offsetHeight * minimapRatio - 1 + 'px'
-      newElem.style.width = element.offsetWidth * minimapRatio - depth + 'px'
+      newElem.style.height = element.offsetHeight * minimapRatio - 4 + 'px'
+      newElem.style.width = element.offsetWidth * minimapRatio - depth * minimapWidth * 0.02 - 1 + 'px'
       const hTags = 'h1, h2, h3, h4, h5, h6'
       var hElem = $(element).children(hTags).length > 0 ? $(element).children(hTags)[0] : null
       console.log(hElem)
@@ -199,15 +199,20 @@ define(function(require) {
         textElem.innerText = $.trim(hElem.innerText)
         textElem.style.marginTop = "0px"
         textElem.style['font-size'] = '1px'
+        textElem.style['font-family'] = 'sans-serif'
         textElem.style.color = "#4F6367"
+        textElem.style['word-spacing'] = '-0.5px'
         newElem.appendChild(textElem)
       }
       if(element.id == "definition"){
         textElem = document.createElement('p')
         textElem.innerText = $.trim($(element).children(".boxtitle")[0].innerText)
         textElem.style['font-size'] = '1px'
+        textElem.style['font-family'] = 'sans-serif'
         textElem.style.color = "#4F6367"
         textElem.style.marginTop = "0px"
+        textElem.style['word-spacing'] = '-0.5px'
+
         newElem.appendChild(textElem)
       }
       $(textElem).addClass("minimapTitle")
@@ -216,9 +221,8 @@ define(function(require) {
       newElem.style.backgroundColor = color
       newElem.style.position = 'absolute'
       newElem.style.top = position.top * minimapRatio + 2 + 'px'
-      newElem.style.left = 2 * depth + 'px'
+      newElem.style.left = depth * minimapWidth * 0.02 + 1 + 'px'
       newElem.style["border-left"] = "1px solid black"
-      newElem.style.marginBottom = "2px"
 
       $(newElem).mouseenter(function(elem, docuElem){
         elem.style.backgroundColor = "rgba(255,255,255,0.3)"
