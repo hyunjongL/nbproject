@@ -1,4 +1,4 @@
-/* notepaneView Plugin
+/* minimapview Plugin
  * Depends:
  *    ui.core.js
  *     ui.view.js
@@ -33,7 +33,6 @@ define(function(require) {
             $.concierge.logHistory('seen', i);
           }
         }
-
         self._model.add('seen', new_seen);
       };
     },
@@ -60,6 +59,7 @@ define(function(require) {
       self.documentHeight = 0;
       self.documentWidth = 0;
       self.maxAnnots = 1;
+      self.emotes = [];
 
       self.locs = null;
       self.element.addClass('minimapView')      
@@ -163,7 +163,91 @@ define(function(require) {
 
       self._update();
     },
+    draw_all_children: function(divs, depth) {
+      for(topic of divs){
+        if(topic.id.startsWith("section") || topic.id == "definition"){
+          this.draw_elem_in_minimap(topic, depth, "rgba(0,0,0,0)")
+          var secondLevelDivs = $(topic).children('div')
+          this.draw_all_children(secondLevelDivs, depth + 1)
+        }
+      }
+    },
+    draw_elem_in_minimap: function(element, depth, color) {
+      const documentWidth = $('body')[0].offsetWidth
+      const documentHeight = $('body')[0].offsetHeight
+      const minimapHeight = this.element[0].offsetHeight
+      const minimapWidth = this.element[0].offsetWidth
+      const mainWidth = $('main')[0].offsetWidth
+      const minimapRatio = minimapWidth / mainWidth
 
+      const position = $(element).offset()
+      if($(element).parents('main').length < 1){
+        return;
+      }
+      var newElem = document.createElement('div')
+      newElem.style.height = element.offsetHeight * minimapRatio - 1 + 'px'
+      newElem.style.width = element.offsetWidth * minimapRatio - depth + 'px'
+      const hTags = 'h1, h2, h3, h4, h5, h6'
+      var hElem = $(element).children(hTags).length > 0 ? $(element).children(hTags)[0] : null
+      console.log(hElem)
+      // var h2Elem = $(element).children('h2').length > 0 ? $(element).children('h2')[0] : null
+      // var h3Elem = $(element).children('h3').length > 0 ? $(element).children('h3')[0] : null
+      // var h4Elem = $(element).children('h4').length > 0 ? $(element).children('h4')[0] : null
+      var textElem
+      if(hElem){
+        textElem = document.createElement('p')
+        textElem.innerText = $.trim(hElem.innerText)
+        textElem.style.marginTop = "0px"
+        textElem.style['font-size'] = '1px'
+        textElem.style.color = "#4F6367"
+        newElem.appendChild(textElem)
+      }
+      if(element.id == "definition"){
+        textElem = document.createElement('p')
+        textElem.innerText = $.trim($(element).children(".boxtitle")[0].innerText)
+        textElem.style['font-size'] = '1px'
+        textElem.style.color = "#4F6367"
+        textElem.style.marginTop = "0px"
+        newElem.appendChild(textElem)
+      }
+      $(textElem).addClass("minimapTitle")
+      // $(textElem).style("margin",  "0 !important", "important")
+      
+      newElem.style.backgroundColor = color
+      newElem.style.position = 'absolute'
+      newElem.style.top = position.top * minimapRatio + 2 + 'px'
+      newElem.style.left = 2 * depth + 'px'
+      newElem.style["border-left"] = "1px solid black"
+      newElem.style.marginBottom = "2px"
+
+      $(newElem).mouseenter(function(elem, docuElem){
+        elem.style.backgroundColor = "rgba(255,255,255,0.3)"
+        if(this.selected != docuElem){
+          docuElem.style.backgroundColor = ""
+        }
+      }.bind(this, newElem, element))
+
+      $(newElem).mouseleave(function(elem, fillStyle, docuElem){
+        elem.style.backgroundColor = fillStyle
+        if(this.selected != docuElem){
+          docuElem.style.backgroundColor = ""
+        }else{
+          docuElem.style.border = "grey solid 1px"
+
+        }
+      }.bind(this, newElem, color, element))
+      newElem.style.cursor = "pointer"
+      $(newElem).click(function(elem, top, e) {
+        if(this.selected){
+          this.selected.style.backgroundColor = ""
+        }
+        $("HTML, BODY").animate({ scrollTop: top }, 300);
+        // docuElem.style.border = "grey solid 1px"
+        this.selected = elem
+      }.bind(this, element, position.top))
+
+      minimapDiv.append(newElem)
+    },
     _render: function () {
       /*
        * this is where we implement the caching strategy we want...
@@ -178,7 +262,8 @@ define(function(require) {
 
       html5locationNum = Object.keys(this._model.o.html5location).length
       if(html5locationNum != this.calculatedNum){
-        console.log(this._model.o)
+        // console.log(this._model.o)
+        this.emotes = []
         var location, body;
         this.calculatedNum = html5locationNum
         var i = 0;
@@ -197,6 +282,8 @@ define(function(require) {
           for(var j=0; j<emotes.length; j++){
             const emote = emotes[j]
             if(body.indexOf(emote) > 0){
+              // console.log($('span[id_item=' + this._model.o.location[annot.id_location].ID + ']'))
+              // this.emotes.push({elem: $('span[id_item=' + this._model.o.location[annot.id_location].ID + ']')[0], emote: emote})
               this.commentElements[annot.path1].emotes[emote.substring(1)] += 1
             }
           }
@@ -208,9 +295,8 @@ define(function(require) {
           })
 
         }
-        console.log(this.commentElements)
       }
-
+      console.log(this.emotes)
       if(this.documentHeight != documentHeight || this.documentWidth != documentWidth){
         this.minimapScrollBar.style.width = minimapWidth - 7 + 'px'
         this.minimapScrollBar.style.height = (minimapWidth * window.innerHeight / mainWidth) + 'px'
@@ -231,10 +317,11 @@ define(function(require) {
         $(minimapDiv).empty()
         minimapDiv.style.height = minimapWidth * ratio + 'px'
         minimapDiv.style.width = minimapWidth + 'px'
+        minimapDiv.style["background-color"] = "#B8D8D8"
         const minimapRatio = minimapWidth / mainWidth
 
-
-        // Draw Map
+        /*
+        // Draw Map (hover/clickable divs of minimap)
         var fillStyle = "#dbdbdb"
         // context.fillStyle = "#dbdbdb"
         const paragraphs = $('p, header, h1, h2, h3, h4, h5, h6, ol, ul')
@@ -288,7 +375,20 @@ define(function(require) {
 
           minimapDiv.append(newElem)
         }
+        */
+        const firstLevelDivs = $('.mt-content-container').children('div')
+        this.draw_all_children(firstLevelDivs, 1)
+        // for(topic of firstLevelDivs){
 
+        //   this.draw_elem_in_minimap(topic, 1, "#7A9E9F")
+        //   var secondLevelDivs = $(topic).children('div')
+        //   for(specific of secondLevelDivs){
+        //     this.draw_elem_in_minimap(specific, 0.8, "#EEF5DB")
+        //   }
+          
+        // }
+
+        // Draw images on the minimap.
         // context.fillStyle = "#212529"
         const images = $('img')
         for(i=0;i<images.length;i++){
@@ -311,26 +411,25 @@ define(function(require) {
         
         var elem, position, score;
         const test = {}
-        for(i in this.commentElements){
-          context.fillStyle = "rgba(225, 225, 0, 0.7)"
-          elem = getElementsByXPath(document, i)[0]
-          position = $(elem).offset()
-          score = this.commentElements[i].numAnnots / this.maxAnnots
-          if(!position || elem.offsetHeight > 500){
-            continue;
-          }
-          test[i] = elem.offsetHeight
-          context.fillRect(position.left, position.top / 4, canvas.width * score, elem.offsetHeight / 4)
-          // console.log('conf', this.commentElements[i].emotes)
-          if(this.commentElements[i].emotes['confused'] > 0){
-            console.log(i, 'confused')
-            context.fillStyle = "rgba(225, 0, 0, 1)"
-            context.fillRect(position.left + elem.offsetWidth - 8, position.top / 4, 15, elem.offsetHeight / 4)
-            elem.style['border-right'] = '3px solid red'
-          }
-        }
+        // for(i in this.commentElements){
+        //   context.fillStyle = "rgba(225, 225, 0, 0.7)"
+        //   elem = getElementsByXPath(document, i)[0]
+        //   position = $(elem).offset()
+        //   score = this.commentElements[i].numAnnots / this.maxAnnots
+        //   if(!position || elem.offsetHeight > 500){
+        //     continue;
+        //   }
+        //   test[i] = elem.offsetHeight
+        //   context.fillRect(position.left, position.top / 4, canvas.width * score, elem.offsetHeight / 4)
+        //   // console.log('conf', this.commentElements[i].emotes)
+        //   // if(this.commentElements[i].emotes['confused'] > 0){
+        //   //   console.log(i, 'confused')
+        //   //   context.fillStyle = "rgba(225, 0, 0, 1)"
+        //   //   context.fillRect(position.left + elem.offsetWidth - 8, position.top / 4, 15, elem.offsetHeight / 4)
+        //   //   elem.style['border-right'] = '3px solid red'
+        //   // }
+        // }
         const sorted = Object.keys(test).sort((a, b)=>test[b]-test[a])
-        console.log('sorted', sorted, test, test[sorted[0]], test[sorted[1]], test[sorted[2]])
       }else if(this.height != minimapHeight || this.width != minimapWidth){
         //canvas resize
         this.height = minimapHeight
