@@ -69,17 +69,10 @@ define(function(require) {
       self.minimapDiv.style.position = "absolute"
       self.element[0].append(self.minimapDiv)
 
-      self.minimapCanvas = document.createElement('canvas');
-      self.minimapCanvas.id = "minimapCanvas"
-      self.minimapCanvas.style.position="absolute"
-      self.element[0].append(self.minimapCanvas)
-      self.minimapCanvas.style['pointer-events'] = 'none'
-
-
+      // Scroll bar that shows position of user in document.
       self.minimapScrollBar = document.createElement('div');
       self.minimapScrollBar.style.position="absolute"
       self.minimapScrollBar.style.border = "2px solid #000"
-      // self.minimapScrollBar.style.backgroundColor = "rgba(100,100,100,0.3)"
       self.minimapScrollBar.style["pointer-events"] = "none"
       self.minimapScrollBar.id = "scrollWindow"
       self.element[0].append(self.minimapScrollBar)
@@ -90,13 +83,15 @@ define(function(require) {
         self._render()
       });
       $(window).resize(self._render);
-      // window.onscroll = this.scrollHandler
+
+      // Scroll trigger is handled regularly rather than on action because onScroll is called excessively.
+
       this.scrolling = false
       $(window).scroll(function(){
         this.scrolling = true
       })
-      // $(window).scroll(this.scrollHandler)
       setInterval(this.scrollHandler, 20)
+
       self.element.closest('div.pers-protection')
       this.commentElements = {}
       this.html5locationNum = 0
@@ -109,7 +104,7 @@ define(function(require) {
     scrollHandler: function(e){
       if(!this.scrolling){
         return;
-      } 
+      }
       this.scrolling = false
       const scrollWindow = this.scrollWindow
       const totalHeight = $('body').height()
@@ -120,7 +115,6 @@ define(function(require) {
       scrollWindow.style.top = barTotalScroll * currentScroll + 'px'
 
       const minimapTotalScroll = this.minimapDiv.offsetHeight - this.minimapDiv.parentElement.offsetHeight
-      this.minimapCanvas.style.top = '-' + minimapTotalScroll * currentScroll + 'px'
       this.minimapDiv.style.top = '-' + minimapTotalScroll * currentScroll + 'px'
     },
 
@@ -130,40 +124,12 @@ define(function(require) {
       var id_source = $.concierge.get_state('file');
       self._id_source =  id_source;
       model.register($.ui.view.prototype.get_adapter.call(this),  { location: null, seen: null, threadmark: null });
-      //for all annotations
       return;
-      //make placeholders for each page:
-      var f = model.o.file[id_source];
-      var $pane = $('div.notepaneView-pages', self.element);
-      $pane.scroll(function (evt) {
-        var timerID = self._scrollTimerID;
-        if (timerID !== null) {
-          window.clearTimeout(timerID);
-        }
-
-        timerID = window.setTimeout(function () {
-          //Are we within 20px from the bottom of scrolling ?
-          while ($pane.children().last().offset().top - $pane.offset().top - $pane.height() < 20) {
-            var maxpage = self._maxpage;
-            $.L('scroll: maxpage=' + maxpage);
-            if (maxpage < f.numpages) {
-              self._render_one(maxpage + 1);
-            }            else {
-              return; //last page has been rendered.
-            }
-          }
-        }, 300);
-
-        self._scrollTimerID =  timerID;
-      });
-
-      for (var i = 1; i <= f.numpages; i++) {
-        $pane.append("<div class='notepaneView-comments' page='" + i + "'/>");
-      }
-
-      self._update();
     },
+
     draw_all_children: function(divs, depth) {
+      // Called recursively to draw all elements
+
       for(topic of divs){
         if(topic.id.startsWith("section") || topic.id == "definition"){
           this.draw_elem_in_minimap(topic, depth, "rgba(0,0,0,0)")
@@ -172,7 +138,10 @@ define(function(require) {
         }
       }
     },
+
     draw_elem_in_minimap: function(element, depth, color) {
+      // process one element and draw it on the map
+      // Depth gives the element a few pixels left margin to show hierarchy
       const documentWidth = $('body')[0].offsetWidth
       const documentHeight = $('body')[0].offsetHeight
       const minimapHeight = this.element[0].offsetHeight
@@ -189,10 +158,7 @@ define(function(require) {
       newElem.style.width = element.offsetWidth * minimapRatio - depth * minimapWidth * 0.02 - 1 + 'px'
       const hTags = 'h1, h2, h3, h4, h5, h6'
       var hElem = $(element).children(hTags).length > 0 ? $(element).children(hTags)[0] : null
-      console.log(hElem)
-      // var h2Elem = $(element).children('h2').length > 0 ? $(element).children('h2')[0] : null
-      // var h3Elem = $(element).children('h3').length > 0 ? $(element).children('h3')[0] : null
-      // var h4Elem = $(element).children('h4').length > 0 ? $(element).children('h4')[0] : null
+
       var textElem
       if(hElem){
         textElem = document.createElement('p')
@@ -212,7 +178,6 @@ define(function(require) {
         textElem.style.color = "#4F6367"
         textElem.style.marginTop = "0px"
         textElem.style['word-spacing'] = '-0.5px'
-
         newElem.appendChild(textElem)
       }
       $(textElem).addClass("minimapTitle")
@@ -224,6 +189,7 @@ define(function(require) {
       newElem.style.left = depth * minimapWidth * 0.02 + 1 + 'px'
       newElem.style["border-left"] = "1px solid black"
 
+      // visual feedback for mouse hover
       $(newElem).mouseenter(function(elem, docuElem){
         elem.style.backgroundColor = "rgba(255,255,255,0.3)"
         if(this.selected != docuElem){
@@ -240,6 +206,8 @@ define(function(require) {
 
         }
       }.bind(this, newElem, color, element))
+
+      // on click, move to where the element is located on the document
       newElem.style.cursor = "pointer"
       $(newElem).click(function(elem, top, e) {
         if(this.selected){
@@ -252,10 +220,8 @@ define(function(require) {
 
       minimapDiv.append(newElem)
     },
+
     _render: function () {
-      /*
-       * this is where we implement the caching strategy we want...
-       */
       var self = this;
       const documentWidth = $('body')[0].offsetWidth
       const documentHeight = $('body')[0].offsetHeight
@@ -264,52 +230,50 @@ define(function(require) {
       const mainWidth = $('main')[0].offsetWidth
       const emotes = ['#interested', '#curious', '#question', '#confused', '#idea', '#frustrated', '#help', '#useful']
 
+      // Number of html5 locations
       html5locationNum = Object.keys(this._model.o.html5location).length
-      if(html5locationNum != this.calculatedNum){
-        // console.log(this._model.o)
-        this.emotes = []
-        var location, body;
-        this.calculatedNum = html5locationNum
-        var i = 0;
-        for(i in this._model.o.html5location){
-          var annot = this._model.o.html5location[i]
-          if(annot.path1 in this.commentElements){
-            this.commentElements[annot.path1].numAnnots += 1
-          }else{
-            this.commentElements[annot.path1] = {numAnnots: 1, emotes: {curious: 0, interested: 0, question: 0, confused: 0, idea: 0, frustrated: 0, help: 0, useful: 0}}
-          }
-          body = this._model.o.location[annot.id_location].body
-          // body = this._model.o.comment
-          // if(body.indexOf('#interested') > 0){
-          //   this.commentElements[annot.path1].emotes.interested
-          // }
-          for(var j=0; j<emotes.length; j++){
-            const emote = emotes[j]
-            if(body.indexOf(emote) > 0){
-              // console.log($('span[id_item=' + this._model.o.location[annot.id_location].ID + ']'))
-              // this.emotes.push({elem: $('span[id_item=' + this._model.o.location[annot.id_location].ID + ']')[0], emote: emote})
-              this.commentElements[annot.path1].emotes[emote.substring(1)] += 1
-            }
-          }
-          if(this.commentElements[annot.path1].numAnnots > this.maxAnnots){
-            this.maxAnnots = this.commentElements[annot.path1].numAnnots
-          }
-          this.commentElements[annot.path1].emotesSorted = Object.keys(this.commentElements[annot.path1].emotes).sort((a, b)=>{
-            return this.commentElements[annot.path1].emotes[b] - this.commentElements[annot.path1].emotes[a]
-          })
 
-        }
-      }
-      console.log(this.emotes)
+      // Below code calculates the distribution of emotes/hashtags in the document.
+      // It uses the html5location of an annotation and calculates based on it.
+      // It may be changed to capture a closest parent element in map and show data on the map.
+      // ***************************************************************************************
+      // if(html5locationNum != this.calculatedNum){
+      //   this.emotes = []
+      //   var location, body;
+      //   this.calculatedNum = html5locationNum
+      //   var i = 0;
+      //   for(i in this._model.o.html5location){
+      //     var annot = this._model.o.html5location[i]
+      //     if(annot.path1 in this.commentElements){
+      //       this.commentElements[annot.path1].numAnnots += 1
+      //     }else{
+      //       this.commentElements[annot.path1] = {numAnnots: 1, emotes: {curious: 0, interested: 0, question: 0, confused: 0, idea: 0, frustrated: 0, help: 0, useful: 0}}
+      //     }
+      //     body = this._model.o.location[annot.id_location].body
+
+      //     for(var j=0; j<emotes.length; j++){
+      //       const emote = emotes[j]
+      //       if(body.indexOf(emote) > 0){
+      //         this.commentElements[annot.path1].emotes[emote.substring(1)] += 1
+      //       }
+      //     }
+      //     if(this.commentElements[annot.path1].numAnnots > this.maxAnnots){
+      //       this.maxAnnots = this.commentElements[annot.path1].numAnnots
+      //     }
+      //     this.commentElements[annot.path1].emotesSorted = Object.keys(this.commentElements[annot.path1].emotes).sort((a, b)=>{
+      //       return this.commentElements[annot.path1].emotes[b] - this.commentElements[annot.path1].emotes[a]
+      //     })
+      //   }
+      // }
+      // ***************************************************************************************
+
+
       if(this.documentHeight != documentHeight || this.documentWidth != documentWidth){
+        // If resized, redraw canvas from scratch
+
+        // ratio recalculation
         this.minimapScrollBar.style.width = minimapWidth - 7 + 'px'
         this.minimapScrollBar.style.height = (minimapWidth * window.innerHeight / mainWidth) + 'px'
-        //ratio recalculation
-        //redraw canvas from scratch
-        const canvas = this.minimapCanvas
-        const context = this.minimapCanvas.getContext('2d');
-        context.clearRect(0, 0 , canvas.width, canvas.height)
-        context.fillStyle = "rgba(255, 255, 0, 0.5)"
 
         canvas.width = documentWidth
         canvas.height = documentHeight / 4
@@ -324,81 +288,17 @@ define(function(require) {
         minimapDiv.style["background-color"] = "#B8D8D8"
         const minimapRatio = minimapWidth / mainWidth
 
-        /*
-        // Draw Map (hover/clickable divs of minimap)
-        var fillStyle = "#dbdbdb"
-        // context.fillStyle = "#dbdbdb"
-        const paragraphs = $('p, header, h1, h2, h3, h4, h5, h6, ol, ul')
-        for(i=0;i<paragraphs.length;i++){
-          const element = paragraphs[i]
-          const position = $(element).offset()
-          if($(element).parents('main').length < 1){
-            continue;
-          }
-          if(i == 'length'){
-            // console.log(position)
-          }
-          if(['H1', 'H2', 'H3', 'H4'].includes(element.tagName)){
-            fillStyle = "#909090"
-          }else{
-            fillStyle = "#dbdbdb"
-          }
-          // context.fillRect(position.left, position.top / 4, element.offsetWidth, element.offsetHeight / 4 - 3)
-          var newElem = document.createElement('div')
-          newElem.style.height = element.offsetHeight * minimapRatio - 1 + 'px'
-          newElem.style.width = element.offsetWidth * minimapRatio - 1 + 'px'
-          newElem.style.backgroundColor = fillStyle
-          newElem.style.position = 'absolute'
-          newElem.style.top = position.top * minimapRatio + 2 + 'px'
-          newElem.style.left = position.left * minimapRatio + 2 + 'px'
-          $(newElem).mouseenter(function(elem, docuElem){
-            elem.style.backgroundColor = "rgba(255,255,255,0.3)"
-            if(this.selected != docuElem){
-              docuElem.style.backgroundColor = "#dbdbdb"
-            }
-          }.bind(this, newElem, element))
-
-          $(newElem).mouseleave(function(elem, fillStyle, docuElem){
-            elem.style.backgroundColor = fillStyle
-            if(this.selected != docuElem){
-              docuElem.style.backgroundColor = ""
-            }else{
-              docuElem.style.border = "grey solid 1px"
-
-            }
-          }.bind(this, newElem, fillStyle, element))
-
-          $(newElem).click(function(elem, top, e) {
-            if(this.selected){
-              this.selected.style.backgroundColor = ""
-            }
-            $("HTML, BODY").animate({ scrollTop: top }, 300);
-            docuElem.style.border = "grey solid 1px"
-            this.selected = elem
-          }.bind(this, element, position.top))
-
-          minimapDiv.append(newElem)
-        }
-        */
         const firstLevelDivs = $('.mt-content-container').children('div')
         this.draw_all_children(firstLevelDivs, 1)
-        // for(topic of firstLevelDivs){
 
-        //   this.draw_elem_in_minimap(topic, 1, "#7A9E9F")
-        //   var secondLevelDivs = $(topic).children('div')
-        //   for(specific of secondLevelDivs){
-        //     this.draw_elem_in_minimap(specific, 0.8, "#EEF5DB")
-        //   }
-          
-        // }
-
-        // Draw images on the minimap.
-        // context.fillStyle = "#212529"
+        // Draw small images on map.
+        // This helps the map look more like a miniature of the document.
         const images = $('img')
         for(i=0;i<images.length;i++){
           const element = images[i]
           if($(element).parents('main').length < 1
             || element.src == "https://a.mtstatic.com/@public/production/site_4463/1474922585-logo.png"){
+            // https://a.mtstatic.com/@public/production/site_4463/1474922585-logo.png --> removed the logo because it was too big
             continue;
           }
           const position = $(element).offset()
@@ -410,32 +310,11 @@ define(function(require) {
           newElem.style.top = position.top * minimapRatio + 4 + 'px'
           newElem.style.left = position.left * minimapRatio + 4 + 'px'
           minimapDiv.append(newElem)
-          // context.drawImage(element,position.left, position.top / 4, element.offsetWidth, element.offsetHeight / 4)
         }
         
         var elem, position, score;
-        const test = {}
-        // for(i in this.commentElements){
-        //   context.fillStyle = "rgba(225, 225, 0, 0.7)"
-        //   elem = getElementsByXPath(document, i)[0]
-        //   position = $(elem).offset()
-        //   score = this.commentElements[i].numAnnots / this.maxAnnots
-        //   if(!position || elem.offsetHeight > 500){
-        //     continue;
-        //   }
-        //   test[i] = elem.offsetHeight
-        //   context.fillRect(position.left, position.top / 4, canvas.width * score, elem.offsetHeight / 4)
-        //   // console.log('conf', this.commentElements[i].emotes)
-        //   // if(this.commentElements[i].emotes['confused'] > 0){
-        //   //   console.log(i, 'confused')
-        //   //   context.fillStyle = "rgba(225, 0, 0, 1)"
-        //   //   context.fillRect(position.left + elem.offsetWidth - 8, position.top / 4, 15, elem.offsetHeight / 4)
-        //   //   elem.style['border-right'] = '3px solid red'
-        //   // }
-        // }
-        const sorted = Object.keys(test).sort((a, b)=>test[b]-test[a])
       }else if(this.height != minimapHeight || this.width != minimapWidth){
-        //canvas resize
+        // save minimap info
         this.height = minimapHeight
         this.width = minimapWidth
       }
